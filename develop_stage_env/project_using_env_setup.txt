@@ -1,0 +1,137 @@
+Steps to Create Separate Environments
+Use Different Namespaces for Each Environment.
+Create Separate Deployments and Services for each environment.
+Use Environment-Specific ConfigMaps and Secrets if necessary.
+Here’s how you can do it:
+
+1. Create Separate Namespaces
+Namespaces allow you to isolate resources between environments.
+# Create 'development' namespace
+kubectl create namespace development
+
+# Create 'stage' namespace
+kubectl create namespace stage
+
+2. Separate YAML Files for Each Environment
+You can create separate Deployment.yaml and Service.yaml files for each environment. The only difference will be the namespace and potentially the replica count or configurations.
+
+Development Deployment and Service
+Create development-deployment.yaml and development-service.yaml with the following structure:
+
+development-deployment.yaml:
+
+yaml
+Copy code
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-flask-deployment
+  namespace: development
+spec:
+  replicas: 3  # Set the number of replicas you want
+  selector:
+    matchLabels:
+      app: python-flask
+  template:
+    metadata:
+      labels:
+        app: python-flask
+    spec:
+      containers:
+      - name: python-flask
+        image: your-docker-image:development  # Use a dev-specific image if needed
+        ports:
+        - containerPort: 80
+development-service.yaml:
+
+yaml
+Copy code
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-flask-service
+  namespace: development
+spec:
+  selector:
+    app: python-flask
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: NodePort
+Stage Deployment and Service
+Similarly, create stage-deployment.yaml and stage-service.yaml:
+
+stage-deployment.yaml:
+
+yaml
+Copy code
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-flask-deployment
+  namespace: stage
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: python-flask
+  template:
+    metadata:
+      labels:
+        app: python-flask
+    spec:
+      containers:
+      - name: python-flask
+        image: your-docker-image:stage  # Use a stage-specific image if needed
+        ports:
+        - containerPort: 80
+stage-service.yaml:
+
+yaml
+Copy code
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-flask-service
+  namespace: stage
+spec:
+  selector:
+    app: python-flask
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: NodePort
+
+3. Apply the Configurations
+Now, apply the YAML files to the respective namespaces:
+
+bash
+Copy code
+# Apply for development environment
+kubectl apply -f development-deployment.yaml
+kubectl apply -f development-service.yaml
+
+# Apply for stage environment
+kubectl apply -f stage-deployment.yaml
+kubectl apply -f stage-service.yaml
+4. Access the Environments
+Each environment will run in its own namespace, but both can be accessed via NodePort (or LoadBalancer, if configured). You can map specific NodePorts or LoadBalancer IPs for both stage and development environments.
+
+For example:
+
+Development might use port 30080.
+Stage might use port 30081.
+Ensure you update the respective nodePort values in the Service configuration if necessary.
+
+Optional: Use Different Configurations (ConfigMaps/Secrets)
+You may also want to use environment-specific settings. You can use ConfigMaps and Secrets for this. You can define ConfigMaps and Secrets in each namespace and reference them in the deployments.
+
+This approach provides an isolated and scalable solution for running multiple environments on the same Kubernetes cluster. Let me know if you need help with any part of the configuration!
+
+ubuntu@ip-172-31-4-235:~/ajay_task/dcurl http://192.168.49.2:30080192.168.49.2:30080
+Hello, Kubernetes
+
+ubuntu@ip-172-31-4-235:~/ajay_task/develop_stage_env$ curl http://192.168.49.2:30081
+Hello, Kubernetes!

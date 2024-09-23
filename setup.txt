@@ -1,0 +1,181 @@
+Step 1: Multi-stage Docker Build
+Example: Python Application
+Create a simple Python Flask app:
+
+app.py:
+
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def hello():
+    return "Hello, World!"
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=80)
+***************************************************
+Dockerfile (Multi-stage build):
+
+# Step 1: Base image for building the application
+FROM python:3.9-slim as builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y gcc
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the source code
+COPY . .
+
+# Step 2: Production-ready image
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Copy installed dependencies from the builder stage
+COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /app /app
+
+# Expose port 80 for the application
+EXPOSE 80
+
+# Set the entrypoint to run the app
+CMD ["python", "app.py"]
+
+*************************************************************
+
+requirements.txt:
+
+flask
+
+***************************************************************
+
+Step 2: Push to Docker Hub
+1.Build the Docker image:
+
+> docker build -t <your-dockerhub-username>/python-flask-app:latest .
+
+2.Login to Docker Hub:
+
+> docker login  = give your docker hub user name and password here 
+
+3. Push the Docker image:
+
+> docker push your-dockerhub-username/python-flask-app:latest
+******************************************************************
+
+Step 3: Kubernetes Deployment Configuration
+You will need to create the following Kubernetes files:
+
+1.Deployment.yaml:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-flask-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: python-flask
+  template:
+    metadata:
+      labels:
+        app: python-flask
+    spec:
+      containers:
+      - name: python-flask-container
+        image: your-dockerhub-username/python-flask-app:latest
+        ports:
+        - containerPort: 80
+
+__________________________________ 
+
+2.Service.yaml:
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-flask-service
+spec:
+  selector:
+    app: python-flask
+  type: LoadBalancer 
+  ports:
+  - protocol: TCP
+    port: 80       
+    targetPort: 80  
+_____________________________
+
+3.HorizontalPodAutoscaler.yaml
+
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: python-flask-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: python-flask-deployment
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60
+
+***********************************************
+
+Step 4: Run and Test Locally with Minikube
+1.Start Minikube:
+> minikube start
+
+2.Apply the configurations:
+> kubectl apply -f Deployment.yaml
+> kubectl apply -f Service.yaml
+> kubectl apply -f HorizontalPodAutoscaler.yaml
+
+3.chack status
+
+> kubectl get pods
+> kubectl get svc
+
+************************************************************************************************8
+
+
+ubuntu@ip-172-31-4-235:~/ajay_task/deployment$ minikube service python-flask-service
+|-----------|----------------------|-------------|---------------------------|
+| NAMESPACE |         NAME         | TARGET PORT |            URL            |
+|-----------|----------------------|-------------|---------------------------|
+| default   | python-flask-service |          80 | http://192.168.49.2:30080 |
+|-----------|----------------------|-------------|---------------------------|
+* Opening service default/python-flask-service in default browser...
+/usr/bin/xdg-open: 882: www-browser: not found
+/usr/bin/xdg-open: 882: links2: not found
+/usr/bin/xdg-open: 882: elinks: not found
+/usr/bin/xdg-open: 882: links: not found
+/usr/bin/xdg-open: 882: lynx: not found
+/usr/bin/xdg-open: 882: w3m: not found
+xdg-open: no method available for opening 'http://192.168.49.2:30080'
+
+X Exiting due to HOST_BROWSER: open url failed: [default python-flask-service 80 http://192.168.49.2:30080]: exit status 3
+* 
+╭─────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                             │
+│    * If the above advice does not help, please let us know:                                 │
+│      https://github.com/kubernetes/minikube/issues/new/choose                               │
+│                                                                                             │
+│    * Please run `minikube logs --file=logs.txt` and attach logs.txt to the GitHub issue.    │
+│    * Please also attach the following file to the GitHub issue:                             │
+│    * - /tmp/minikube_service_1f166231f2c0a3ec6c1bd750b74b270788076d18_0.log                 │
+│                                                                                             │
+╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ubuntu@ip-172-31-4-235:~/ajay_task/deployment$ curl http://192.168.49.2:30080
+Hello, Kubernetes!ubuntu@ip-172-31-4-235:~/ajay_task/deployment$ 
+
+
+

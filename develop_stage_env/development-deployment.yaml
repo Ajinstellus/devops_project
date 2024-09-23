@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-flask-deployment
+  namespace: development
+spec:
+  replicas: 3  # Set the number of replicas you want
+  selector:
+    matchLabels:
+      app: python-flask
+  template:
+    metadata:
+      labels:
+        app: python-flask
+    spec:
+      containers:
+      - name: python-flask
+        image: ajin0809/python-flask-app:latest  # Use a dev-specific image if needed
+        ports:
+        - containerPort: 80
